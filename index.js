@@ -18,6 +18,15 @@ app.get("/", (req, res) => {
   res.send("Hello World! I am working fine");
 });
 
+const flight = require("./Routers/FlightRouter");
+
+app.use("/api/v1/flight", flight);
+
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ message: "Bir hata oluştu!" });
+});
+
 app.listen(process.env.PORT, () => {
   console.log(`Server is running on port ${process.env.PORT}`);
 });
