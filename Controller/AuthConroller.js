@@ -1,5 +1,5 @@
 const User = require("../Models/User");
-const bcrypt = require("bcrypt");
+const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const nodemailer = require("nodemailer");
 const otpGenerator = require("otp-generator");
@@ -9,79 +9,50 @@ dotenv.config();
 
 const login = async (req, res) => {
   try {
-    const [email, password, phone] = req.body;
-    const user = await User.findOne({ $or: [{ email }, { phone }] });
-    let errorMessage = [
-      {
-        check: !password,
-        message: "Lütfen tüm alanları doldurunuz",
-      },
-      {
-        check: !email && !phone,
-        message: "Lütfen tüm alanları doldurunuz",
-      },
-      {
-        check: user.email !== email && user.phone !== phone,
-        message: "Kullanıcı bulunamadı",
-      },
-      {
-        check: !(await bcrypt.compare(password, user.password)),
-        message: "Şifre ve email hatalı",
-      },
-    ];
-
-    let i = 0;
-    while (i < errorMessage.length) {
-      if (errorMessage[i].check) {
-        return res.status(400).json({ message: errorMessage[i].message });
-      }
-      i++;
+    const user = await User.findOne({ email: req.body.email }).select(
+      "+password"
+    );
+    if (!user) {
+      return res.status(400).json({ message: "Kullanıcı bulunamadı" });
+    }
+    const isMatch = await bcrypt.compare(req.body.password, user.password);
+    if (!isMatch) {
+      return res.status(401).send({
+        message: "Geçersiz e-posta veya şifre",
+        success: false,
+      });
     }
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
       expiresIn: "86400",
     });
     res.cookie("token", token, { httpOnly: true, maxAge: 24 * 60 * 60 * 1000 });
-    res.status(200).json({ message: "Giriş yapıldı", token });
+    res.status(200).json({ message: "Giriş yapıldı", token, user });
   } catch (error) {
     console.log("🚀 ~ login ~ error:", error);
+    res.status(500).json({ message: error });
   }
 };
 
 const register = async (req, res) => {
   try {
-    const { name, email, phone, age, gender, password, passwordConfirm } =
-      req.body;
-
-    const user = await User.findOne({ $or: [{ email }, { phone }] });
-    let errorMessage = [
-      {
-        check:
-          !name ||
-          !email ||
-          !phone ||
-          !age ||
-          !gender ||
-          !password ||
-          !passwordConfirm,
-        message: "Lütfen tüm alanları doldurunuz",
-      },
-      {
-        check: user.email === email && user.phone === phone,
-        message: "Kullanılmış email ve telefon numarası",
-      },
-      {
-        check: password !== passwordConfirm,
-        message: "Sifreler uyuşmuyor",
-      },
-    ];
-
-    let i = 0;
-    while (i < errorMessage.length) {
-      if (errorMessage[i].check) {
-        return res.status(400).json({ message: errorMessage[i].message });
-      }
-      i++;
+    const { name, surname, email, phone, password, passwordConfirm } = req.body;
+    const user = await User.findOne({ email });
+    if (user !== null) {
+      return res.status(400).json({ message: "Kullanıcı mevcut" });
     }
+    if (
+      !name ||
+      !surname ||
+      !email ||
+      !phone ||
+      !password ||
+      !passwordConfirm
+    ) {
+      return res
+        .status(400)
+        .json({ message: "Lütfen tüm alanları doldurunuz" });
+    }
+
     const otp = otpGenerator.generate(6, {
       digits: true,
       upperCase: false,
@@ -91,50 +62,61 @@ const register = async (req, res) => {
     });
 
     req.body.otp = otp;
-    const newUser = new User({
-      name,
-      email,
-      phone,
-      age,
-      gender,
-    });
-    const result = await newUser.save();
-    if (!result) {
-      throw new Error("Kayıt sırasında hata oluştu.");
-    }
-    const token = jwt.sign({ _id: user._id }, process.env.JWT_SECRET);
 
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-    });
-
-    const mailOptions = {
-      from: process.env.EMAIL_USER,
-      to: email,
-      subject: "E-posta doğrulaması için OTP'niz",
-      text: `Hesap doğrulaması için: ${otp}`,
-    };
-
-    transporter.sendMail(mailOptions, function (error, info) {
-      if (error) {
-        console.log(error);
-      } else {
-        console.log("Email sent: " + info.response);
+    if (password === passwordConfirm) {
+      // ? Create new user
+      const newUser = new User({
+        name,
+        surname,
+        email,
+        phone,
+        password,
+        passwordConfirm,
+        otp,
+      });
+      const result = await newUser.save();
+      if (!result) {
+        throw new Error("Kayıt sırasında hata oluştu.");
       }
-    });
-    res.status(200).json({ message: "Kayıt yapıldı", token });
+      // ? Token generate
+      const token = jwt.sign({ _id: result._id }, process.env.JWT_SECRET);
+      // ? Send mail
+      const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS,
+        },
+      });
+      // ? Mail options
+      const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to: email,
+        subject: "E-posta doğrulaması için OTP'niz",
+        text: `Hesap doğrulaması için: ${otp}`,
+      };
+      // ? Send mail function error
+      transporter.sendMail(mailOptions, function (error, info) {
+        if (error) {
+          console.log(error);
+        } else {
+          console.log("Email sent: " + info.response);
+        }
+      });
+      res.status(201).json({ message: "Kayıt yapıldı", data: result, token });
+    }
   } catch (error) {
     console.log("🚀 ~ register ~ error:", error);
+    res.status(500).json({ message: error });
   }
 };
 
 const accountDelet = async (req, res) => {
   try {
     const { token, email, password } = req.body;
+    if (token == null) {
+      return res.status(400).json({ message: "Giris yapmanız gerekiyor" });
+    }
     if (!email || !password) {
       return res
         .status(400)

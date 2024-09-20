@@ -19,8 +19,12 @@ app.get("/", (req, res) => {
 });
 
 const flight = require("./Routers/FlightRouter");
+const Image = require("./Routers/ImageRouter");
+const auth = require("./Routers/AuthRouter");
 
 app.use("/api/v1/flight", flight);
+app.use("/api/v1/image", Image);
+app.use("/api/v1/auth", auth);
 
 app.use((err, req, res, next) => {
   console.error(err.stack);
