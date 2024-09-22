@@ -71,7 +71,6 @@ const register = async (req, res) => {
         email,
         phone,
         password,
-        passwordConfirm,
         otp,
       });
       const result = await newUser.save();
@@ -113,16 +112,16 @@ const register = async (req, res) => {
 
 const accountDelet = async (req, res) => {
   try {
-    const { token, email, password } = req.body;
+    const { token, email, password, userId } = req.body;
     if (token == null) {
-      return res.status(400).json({ message: "Giris yapmanız gerekiyor" });
+      return res.status(400).json({ message: "Giriş yapmanız gerekiyor" });
     }
     if (!email || !password) {
       return res
         .status(400)
         .json({ message: "Lütfen tüm alanları doldurunuz" });
     }
-    const user = await User.findOne({ email });
+    const user = await User.findById(userId);
 
     if (!(await bcrypt.compare(password, user.password))) {
       return res.status(400).json({ message: "Sifre ve email hatalı" });
@@ -136,22 +135,30 @@ const accountDelet = async (req, res) => {
 
 const accountUpdate = async (req, res) => {
   try {
-    const { name, email, phone, age, gender, picture, password } = req.body;
-    const user = await User.findOne({ email });
+    const { name, email, userId, phone, token, password, passwordConfirm } =
+      req.body;
+    console.log(name, email, phone, password, passwordConfirm);
+    console.log("UserID", userId);
+
+    if (token == null) {
+      return res.status(400).json({ message: "Giriş yapmanız gerekiyor" });
+    }
+    const user = await User.findById(userId);
+    console.log("🚀 ~ accountUpdate ~ user:", user);
     if (!user) {
       return res.status(400).json({ message: "Kullanıcı bulunamadı" });
     }
+    if (password !== passwordConfirm) {
+      return res.status(400).json({ message: "Şifreler aynı olmalıdır" });
+    }
     const passwordController = await bcrypt.compare(password, user.password);
-    if (!passwordController) {
+    if (passwordController) {
       return res.status(400).json({ message: "Aynı şifre ile güncellenemez" });
     }
     user.name = name || user.name;
     user.email = email || user.email;
     user.phone = phone || user.phone;
-    user.age = age || user.age;
-    user.gender = gender || user.gender;
     user.password = password || user.password;
-    user.picture = picture || user.picture;
     await user.save();
     res.status(200).json({ message: "Hesap bilgileri güncellendi" });
   } catch (error) {

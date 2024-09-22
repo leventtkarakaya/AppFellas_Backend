@@ -12,7 +12,7 @@ router = express.Router();
 // Belirli endpoint'ler için route tanımlamaları
 router.post("/login", login);
 router.post("/register", register);
-router.post("/accountDelet", accountDelet);
-router.post("/accountUpdate", accountUpdate);
+router.post("/accountDelete", accountDelet);
+router.put("/accountUpdate", accountUpdate);
 
 module.exports = router;

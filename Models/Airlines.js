@@ -1,9 +1,13 @@
 const mongoose = require("mongoose");
 
 const airlineSchema = new mongoose.Schema({
-  iata: {
+  id: {
     type: String,
     required: true,
+    unique: true,
+  },
+  iata: {
+    type: String,
   },
   icao: {
     type: String,
@@ -14,7 +18,6 @@ const airlineSchema = new mongoose.Schema({
   },
   publicName: {
     type: String,
-    required: true,
   },
 });
 

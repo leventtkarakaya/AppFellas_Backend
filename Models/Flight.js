@@ -2,6 +2,11 @@ const mongoose = require("mongoose");
 
 const flightSchema = new mongoose.Schema(
   {
+    id: {
+      type: String,
+      required: true,
+      unique: true,
+    },
     lastUpdatedAt: {
       type: Date,
       required: true,
@@ -28,11 +33,6 @@ const flightSchema = new mongoose.Schema(
     flightNumber: {
       type: Number,
       required: true,
-    },
-    id: {
-      type: String,
-      required: true,
-      unique: true,
     },
     isOperationalFlight: {
       type: Boolean,

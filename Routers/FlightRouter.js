@@ -9,7 +9,7 @@ const {
 router = express.Router();
 
 // Belirli endpoint'ler için route tanımlamaları
-router.get("/", getFlight);
+router.post("/getFlight", getFlight);
 router.get("/getAirlines", getAirlines);
 router.get("/getDestination", getDestination);
 
